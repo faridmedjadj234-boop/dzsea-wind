@@ -377,7 +377,7 @@ loadLocation(selected);
       loadWindGrid();
     }, 900);
   }
-
+canvas.style.display = "none";
   map.on("moveend zoomend", scheduleWindRefresh);
   map.on("movestart zoomstart", () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
