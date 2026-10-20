@@ -200,3 +200,204 @@ el("locateBtn").addEventListener("click", () => {
 showPlaceList();
 drawPlaceMarkers();
 loadLocation(selected);
+
+
+/* DzSea Wind - experimental animated wind layer */
+(() => {
+  const canvas = document.createElement("canvas");
+  canvas.style.cssText =
+    "position:absolute;inset:0;width:100%;height:100%;z-index:450;pointer-events:none;";
+  map.getContainer().appendChild(canvas);
+
+  const ctx = canvas.getContext("2d");
+  let windPoints = [];
+  let particles = [];
+  let animationId;
+  let refreshTimer;
+  let loading = false;
+
+  function resizeCanvas() {
+    const rect = map.getContainer().getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, rect.width, rect.height);
+    particles = [];
+    for (let i = 0; i < 180; i++) {
+      particles.push({
+        x: Math.random() * rect.width,
+        y: Math.random() * rect.height,
+        age: Math.random() * 80
+      });
+    }
+  }
+
+  function nearestWind(lat, lon) {
+    if (!windPoints.length) return null;
+
+    let best = null;
+    let bestDistance = Infinity;
+
+    for (const p of windPoints) {
+      const dx = (p.lon - lon) * Math.cos(lat * Math.PI / 180);
+      const dy = p.lat - lat;
+      const distance = dx * dx + dy * dy;
+
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = p;
+      }
+    }
+    return best;
+  }
+
+  function windAt(x, y) {
+    const ll = map.containerPointToLatLng([x, y]);
+    const p = nearestWind(ll.lat, ll.lng);
+    if (!p) return null;
+
+    const angle = (p.direction + 180) * Math.PI / 180;
+    return {
+      dx: Math.sin(angle) * p.speed * 0.045,
+      dy: -Math.cos(angle) * p.speed * 0.045,
+      speed: p.speed
+    };
+  }
+
+  function drawParticles() {
+    const rect = map.getContainer().getBoundingClientRect();
+    const w = rect.width;
+    const h = rect.height;
+
+    if (selectedLayer !== "wind" || !windPoints.length) {
+      ctx.clearRect(0, 0, w, h);
+      animationId = requestAnimationFrame(drawParticles);
+      return;
+    }
+
+    ctx.fillStyle = "rgba(8, 20, 35, 0.10)";
+    ctx.fillRect(0, 0, w, h);
+
+    for (const p of particles) {
+      const wind = windAt(p.x, p.y);
+
+      if (!wind || wind.speed < 1) {
+        p.age = 100;
+      } else {
+        const oldX = p.x;
+        const oldY = p.y;
+
+        p.x += wind.dx;
+        p.y += wind.dy;
+        p.age++;
+
+        ctx.beginPath();
+        ctx.moveTo(oldX, oldY);
+        ctx.lineTo(p.x, p.y);
+
+        ctx.strokeStyle =
+          wind.speed < 10 ? "rgba(115,226,187,.8)" :
+          wind.speed < 25 ? "rgba(75,214,231,.9)" :
+          wind.speed < 40 ? "rgba(255,206,105,.9)" :
+                            "rgba(255,138,120,.95)";
+
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+
+      if (
+        p.age > 90 || p.x < 0 || p.x > w ||
+        p.y < 0 || p.y > h
+      ) {
+        p.x = Math.random() * w;
+        p.y = Math.random() * h;
+        p.age = 0;
+      }
+    }
+
+    animationId = requestAnimationFrame(drawParticles);
+  }
+
+  async function loadWindGrid() {
+    if (loading || selectedLayer !== "wind") return;
+    loading = true;
+
+    try {
+      const bounds = map.getBounds();
+      const south = Math.max(-75, bounds.getSouth());
+      const north = Math.min(75, bounds.getNorth());
+      const west = Math.max(-180, bounds.getWest());
+      const east = Math.min(180, bounds.getEast());
+
+      const latitudes = [];
+      const longitudes = [];
+      const count = 9;
+
+      for (let y = 0; y < count; y++) {
+        for (let x = 0; x < count; x++) {
+          latitudes.push(south + (north - south) * y / (count - 1));
+          longitudes.push(west + (east - west) * x / (count - 1));
+        }
+      }
+
+      const url = new URL("https://api.open-meteo.com/v1/forecast");
+      url.search = new URLSearchParams({
+        latitude: latitudes.join(","),
+        longitude: longitudes.join(","),
+        current: "wind_speed_10m,wind_direction_10m",
+        wind_speed_unit: "kmh"
+      }).toString();
+
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Wind API error");
+
+      const result = await response.json();
+      const locations = Array.isArray(result) ? result : [result];
+
+      windPoints = locations.map((item, i) => ({
+        lat: latitudes[i],
+        lon: longitudes[i],
+        speed: Number(item.current?.wind_speed_10m ?? 0),
+        direction: Number(item.current?.wind_direction_10m ?? 0)
+      })).filter(p =>
+        Number.isFinite(p.speed) &&
+        Number.isFinite(p.direction)
+      );
+    } catch (error) {
+      console.error("Wind overlay:", error);
+    } finally {
+      loading = false;
+    }
+  }
+
+  function scheduleWindRefresh() {
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(() => {
+      resizeCanvas();
+      loadWindGrid();
+    }, 900);
+  }
+
+  map.on("moveend zoomend", scheduleWindRefresh);
+  map.on("movestart zoomstart", () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  });
+
+  const oldUpdateMarkerStyles = updateMarkerStyles;
+  updateMarkerStyles = function () {
+    oldUpdateMarkerStyles();
+    if (selectedLayer === "wind") {
+      scheduleWindRefresh();
+    } else {
+      windPoints = [];
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+  };
+
+  window.addEventListener("resize", resizeCanvas);
+
+  resizeCanvas();
+  loadWindGrid();
+  drawParticles();
+})();
