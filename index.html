@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#071827">
+  <title>DzSea Wind — الطقس البحري الجزائري</title>
+  <meta name="description" content="خريطة تفاعلية لتوقعات الرياح والأمواج على الساحل الجزائري.">
+  <link rel="preconnect" href="https://unpkg.com">
+  <link rel="preconnect" href="https://tile.openstreetmap.org">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand-mark" aria-hidden="true">🌊</div>
+    <div class="brand-copy">
+      <h1>DzSea <span>Wind</span></h1>
+      <p>الطقس البحري للساحل الجزائري</p>
+    </div>
+    <button id="refreshBtn" class="icon-btn" title="تحديث البيانات" aria-label="تحديث البيانات">↻</button>
+  </header>
+
+  <main>
+    <section class="map-wrap" aria-label="الخريطة البحرية">
+      <div class="map-top-controls">
+        <div class="layer-switch" role="group" aria-label="نوع البيانات">
+          <button class="layer-btn active" data-layer="wind">💨 الرياح</button>
+          <button class="layer-btn" data-layer="waves">🌊 الأمواج</button>
+        </div>
+        <button id="locateBtn" class="map-action">◎ موقعي</button>
+      </div>
+      <div id="map" role="application" aria-label="خريطة تفاعلية للساحل الجزائري"></div>
+      <div class="map-legend" id="mapLegend">
+        <span class="legend-dot"></span>
+        <span id="legendText">سرعة الرياح — كم/سا</span>
+      </div>
+      <div class="map-hint">اضغط على الخريطة لاختيار موقع بحري</div>
+    </section>
+
+    <section class="content">
+      <div class="section-heading">
+        <div>
+          <h2 id="selectedTitle">حالة البحر</h2>
+          <p id="selectedCoords">اختر مدينة أو نقطة على الخريطة</p>
+        </div>
+        <span id="status" class="status-pill">جاهز</span>
+      </div>
+
+      <div class="metric-grid">
+        <article class="metric-card">
+          <div class="metric-icon wind-icon">💨</div>
+          <p>سرعة الرياح</p>
+          <div class="metric-value"><span id="windSpeed">—</span><small>كم/سا</small></div>
+          <div class="metric-note" id="windDirection">الاتجاه: —</div>
+        </article>
+        <article class="metric-card">
+          <div class="metric-icon wave-icon">🌊</div>
+          <p>ارتفاع الموج</p>
+          <div class="metric-value"><span id="waveHeight">—</span><small>متر</small></div>
+          <div class="metric-note" id="waveDirection">الاتجاه: —</div>
+        </article>
+        <article class="metric-card">
+          <div class="metric-icon period-icon">⏱️</div>
+          <p>فترة الموج</p>
+          <div class="metric-value"><span id="wavePeriod">—</span><small>ثانية</small></div>
+          <div class="metric-note">بين قمة موجة والتي تليها</div>
+        </article>
+        <article class="metric-card">
+          <div class="metric-icon temp-icon">🌡️</div>
+          <p>درجة الحرارة</p>
+          <div class="metric-value"><span id="temperature">—</span><small>°م</small></div>
+          <div class="metric-note" id="gusts">هبات الرياح: —</div>
+        </article>
+      </div>
+
+      <section class="forecast-panel">
+        <div class="forecast-header">
+          <div>
+            <h3>التوقعات القادمة</h3>
+            <p>كل 3 ساعات — حسب توفر بيانات المصدر</p>
+          </div>
+          <span class="source-tag">Open-Meteo</span>
+        </div>
+        <div id="forecast" class="forecast-list">
+          <div class="loading-row">جارٍ تحميل التوقعات…</div>
+        </div>
+      </section>
+
+      <section class="places-panel">
+        <div class="forecast-header">
+          <div>
+            <h3>مناطق ساحلية</h3>
+            <p>اضغط على منطقة لعرض بياناتها</p>
+          </div>
+        </div>
+        <div id="places" class="places-list"></div>
+      </section>
+
+      <p class="disclaimer">
+        تنبيه: هذه توقعات نموذجية وليست قياسات مباشرة من البحر ولا بديلاً عن نشرات الأرصاد والتحذيرات الرسمية.
+        تحقق من الظروف المحلية قبل الصيد أو الإبحار.
+      </p>
+    </section>
+  </main>
+
+  <footer>
+    <span>DzSea Wind</span>
+    <span>بيانات الطقس: Open-Meteo · الخريطة: OpenStreetMap</span>
+  </footer>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
