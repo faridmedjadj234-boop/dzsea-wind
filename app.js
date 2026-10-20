@@ -275,7 +275,7 @@ loadLocation(selected);
       return;
     }
 
-    ctx.fillStyle = "rgba(8, 20, 35, 0.10)";
+    ctx.clearRect(0, 0, w, h);
     ctx.fillRect(0, 0, w, h);
 
     for (const p of particles) {
