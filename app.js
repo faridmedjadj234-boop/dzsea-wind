@@ -232,7 +232,6 @@ loadLocation(selected);
       });
     }
   }
-
   function nearestWind(lat, lon) {
     if (!windPoints.length) return null;
 
