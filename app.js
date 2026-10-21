@@ -455,10 +455,24 @@ async function loadLocation(place) {
   const windDirection = compass(current?.wind_direction_10m);
   const temperature = numberOrDash(current?.temperature_2m, 1);
 
-  const waveValue = numberOrDash(
-    marine?.current?.wave_height,
-    1
-  );
+  const marineTimes = marine?.hourly?.time || [];
+const waveHeights = marine?.hourly?.wave_height || [];
+const wavePeriods = marine?.hourly?.wave_period || [];
+
+const marineIndex = findNearestHour(
+  marineTimes,
+  current?.time || marineTimes[0]
+);
+
+const waveValue = numberOrDash(
+  marineIndex >= 0 ? waveHeights[marineIndex] : null,
+  1
+);
+
+const wavePeriodValue = numberOrDash(
+  marineIndex >= 0 ? wavePeriods[marineIndex] : null,
+  0
+);
 
   [
     "windSpeed",
