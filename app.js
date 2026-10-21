@@ -1,3 +1,13 @@
+
+/* ==========================================
+   DzSea Wind — Algeria Coastal Weather
+   Weather: Open-Meteo
+   Map: Leaflet + OpenStreetMap
+   ========================================== */
+
+"use strict";
+
+// 1. المدن الساحلية الجزائرية
 const coastalPlaces = [
   { name: "الجزائر العاصمة", lat: 36.7538, lon: 3.0588 },
   { name: "تيبازة", lat: 36.589, lon: 2.448 },
@@ -11,382 +21,590 @@ const coastalPlaces = [
   { name: "تلمسان / الغزوات", lat: 35.100, lon: -1.850 }
 ];
 
-const map = L.map("map", { zoomControl: false }).setView([36.25, 3.2], 7);
-L.control.zoom({ position: "bottomright" }).addTo(map);
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  maxZoom: 18,
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-}).addTo(map);
+// 2. التأكد من وجود الخريطة
+const el = id => document.getElementById(id);
 
+if (typeof L === "undefined" || !el("map")) {
+  console.error("DzSea Wind: Leaflet أو عنصر الخريطة غير موجود.");
+  if (el("status")) {
+    el("status").textContent =
+      "تعذر تشغيل الخريطة. تحقق من تحميل مكتبة Leaflet.";
+  }
+  throw new Error("Map initialization failed");
+}
+
+// 3. إعداد الخريطة
+const map = L.map("map", {
+  zoomControl: false
+}).setView([36.25, 3.2], 7);
+
+L.control.zoom({ position: "bottomright" }).addTo(map);
+
+L.tileLayer(
+  "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+  {
+    maxZoom: 18,
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+  }
+).addTo(map);
+
+// 4. حالة الموقع
 let selectedLayer = "wind";
-let selected = { name: "تيبازة", lat: 36.589, lon: 2.448 };
+let selected = {
+  name: "تيبازة",
+  lat: 36.589,
+  lon: 2.448
+};
+
 let markers = [];
 let requestCounter = 0;
 
-const el = id => document.getElementById(id);
-const numberOrDash = (value, digits = 1) =>
-  value === null || value === undefined || !Number.isFinite(Number(value))
-    ? "—" : Number(value).toFixed(digits);
+function setText(id, value) {
+  const node = el(id);
+  if (node) node.textContent = value;
+}
+
+function numberOrDash(value, digits = 1) {
+  if (
+    value === null ||
+    value === undefined ||
+    value === "" ||
+    !Number.isFinite(Number(value))
+  ) {
+    return "—";
+  }
+
+  return Number(value).toFixed(digits);
+}
 
 function compass(deg) {
-  if (deg === null || deg === undefined || !Number.isFinite(Number(deg))) return "—";
-  const dirs = ["شمال", "شمال شرق", "شرق", "جنوب شرق", "جنوب", "جنوب غرب", "غرب", "شمال غرب"];
-  return dirs[Math.round(Number(deg) / 45) % 8] + ` (${Math.round(Number(deg))}°)`;
+  if (
+    deg === null ||
+    deg === undefined ||
+    !Number.isFinite(Number(deg))
+  ) {
+    return "—";
+  }
+
+  const directions = [
+    "شمال",
+    "شمال شرق",
+    "شرق",
+    "جنوب شرق",
+    "جنوب",
+    "جنوب غرب",
+    "غرب",
+    "شمال غرب"
+  ];
+
+  const index =
+    Math.round((((Number(deg) % 360) + 360) % 360) / 45) % 8;
+
+  return directions[index] + ` (${Math.round(Number(deg))}°)`;
 }
+
 function windColor(speed) {
   if (speed < 10) return "#73e2bb";
   if (speed < 25) return "#4bd6e7";
   if (speed < 40) return "#ffce69";
   return "#ff8a78";
 }
-function markerIcon(value, layer) {
-  const content = layer === "wind" ? "➤" : "≈";
-  const color = layer === "wind" ? windColor(value ?? 0) : "#77c8ff";
+
+function setStatus(message, error = false) {
+  setText("status", message);
+
+  const node = el("status");
+  if (node) {
+    node.style.color = error ? "#ffb9a8" : "#76e0bb";
+  }
+}
+
+// 5. رموز الخريطة
+function markerIcon(value, layer, direction = 0) {
+  const isWind = layer === "wind";
+  const content = isWind ? "➤" : "≈";
+  const color = isWind
+    ? windColor(Number(value ?? 0))
+    : "#77c8ff";
+
+  const rotation = isWind
+    ? Number(direction || 0)
+    : 0;
+
   return L.divIcon({
     className: "",
-    html: `<div class="wind-marker ${layer === "waves" ? "wave" : ""}" style="color:${color};transform:rotate(${layer === "wind" ? 0 : 0}deg)">${content}</div>`,
-    iconSize: [40, 40], iconAnchor: [20, 20]
+    html: `
+      <div class="wind-marker ${isWind ? "" : "wave"}"
+           style="color:${color};transform:rotate(${rotation}deg)">
+        ${content}
+      </div>
+    `,
+    iconSize: [40, 40],
+    iconAnchor: [20, 20]
   });
 }
-function setStatus(message, error = false) {
-  el("status").textContent = message;
-  el("status").style.color = error ? "#ffb9a8" : "#76e0bb";
-}
+
+// 6. قائمة المدن
 function showPlaceList() {
-  el("places").innerHTML = coastalPlaces.map((p, i) =>
-    `<button class="place-btn" data-place="${i}"><strong>${p.name}</strong><span>${p.lat.toFixed(2)}°, ${p.lon.toFixed(2)}°</span></button>`
-  ).join("");
-  el("places").querySelectorAll("[data-place]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const p = coastalPlaces[Number(btn.dataset.place)];
-      map.flyTo([p.lat, p.lon], 9, { duration: 0.7 });
-      loadLocation(p);
+  const container = el("places");
+  if (!container) return;
+
+  container.innerHTML = coastalPlaces.map((place, index) => `
+    <button class="place-btn" data-place="${index}">
+      <strong>${place.name}</strong>
+      <span>${place.lat.toFixed(2)}°, ${place.lon.toFixed(2)}°</span>
+    </button>
+  `).join("");
+
+  container.querySelectorAll("[data-place]").forEach(button => {
+    button.addEventListener("click", () => {
+      const place = coastalPlaces[Number(button.dataset.place)];
+
+      map.flyTo([place.lat, place.lon], 9, {
+        duration: 0.7
+      });
+
+      loadLocation(place);
     });
   });
 }
+
+// 7. علامات المدن
 function drawPlaceMarkers() {
-  markers.forEach(m => map.removeLayer(m));
+  markers.forEach(marker => map.removeLayer(marker));
   markers = [];
-  coastalPlaces.forEach(p => {
-    const m = L.marker([p.lat, p.lon], { icon: markerIcon(null, selectedLayer) }).addTo(map);
-    m.bindTooltip(p.name, { direction: "top", offset: [0, -16] });
-    m.on("click", () => loadLocation(p));
-    markers.push(m);
+
+  coastalPlaces.forEach(place => {
+    const marker = L.marker(
+      [place.lat, place.lon],
+      { icon: markerIcon(null, selectedLayer) }
+    ).addTo(map);
+
+    marker.bindTooltip(place.name, {
+      direction: "top",
+      offset: [0, -16]
+    });
+
+    marker.on("click", () => loadLocation(place));
+    markers.push(marker);
   });
 }
+
 function updateMarkerStyles() {
-  markers.forEach((m, i) => m.setIcon(markerIcon(null, selectedLayer)));
-  el("legendText").textContent = selectedLayer === "wind" ? "سرعة الرياح — كم/سا" : "ارتفاع الموج — متر";
-  document.querySelectorAll(".layer-btn").forEach(b => b.classList.toggle("active", b.dataset.layer === selectedLayer));
+  markers.forEach(marker => {
+    marker.setIcon(markerIcon(null, selectedLayer));
+  });
+
+  setText(
+    "legendText",
+    selectedLayer === "wind"
+      ? "سرعة الرياح — كم/سا"
+      : "ارتفاع الموج — متر"
+  );
+
+  document.querySelectorAll(".layer-btn").forEach(button => {
+    button.classList.toggle(
+      "active",
+      button.dataset.layer === selectedLayer
+    );
+  });
 }
-function renderForecast(weather, marine) {
-  const times = weather?.hourly?.time || [];
-  
-const hourlyWeather = weather?.hourly;
-const weatherTimes = hourlyWeather?.time || [];
 
-let weatherIndex = -1;
+// 8. جلب البيانات من واجهة الطقس
+async function fetchWeather(place) {
+  const url = new URL("https://api.open-meteo.com/v1/forecast");
 
-if (currentTime && weatherTimes.length > 0) {
-  const currentTimestamp = new Date(currentTime).getTime();
-  let smallestDifference = Infinity;
+  url.search = new URLSearchParams({
+    latitude: String(place.lat),
+    longitude: String(place.lon),
+    current:
+      "temperature_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m",
+    hourly:
+      "wind_speed_10m,wind_direction_10m,visibility,weather_code",
+    forecast_days: "3",
+    timezone: "Africa/Algiers",
+    wind_speed_unit: "kmh"
+  }).toString();
 
-  weatherTimes.forEach((time, index) => {
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error("Weather API: " + response.status);
+  }
+
+  return response.json();
+}
+
+// 9. جلب بيانات الأمواج
+async function fetchMarine(place) {
+  const url = new URL("https://marine-api.open-meteo.com/v1/marine");
+
+  url.search = new URLSearchParams({
+    latitude: String(place.lat),
+    longitude: String(place.lon),
+    hourly: "wave_height,wave_period",
+    forecast_days: "3",
+    timezone: "Africa/Algiers"
+  }).toString();
+
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error("Marine API: " + response.status);
+  }
+
+  return response.json();
+}
+
+// 10. تحديد الساعة الأقرب إلى الوقت الحالي
+function findNearestHour(times, currentTime) {
+  if (!Array.isArray(times) || !times.length || !currentTime) {
+    return -1;
+  }
+
+  const target = new Date(currentTime).getTime();
+  if (!Number.isFinite(target)) return -1;
+
+  let nearestIndex = -1;
+  let nearestDifference = Infinity;
+
+  times.forEach((time, index) => {
     const timestamp = new Date(time).getTime();
-    const difference = Math.abs(timestamp - currentTimestamp);
+    const difference = Math.abs(timestamp - target);
 
-    if (Number.isFinite(difference) && difference < smallestDifference) {
-      smallestDifference = difference;
-      weatherIndex = index;
+    if (
+      Number.isFinite(difference) &&
+      difference < nearestDifference
+    ) {
+      nearestDifference = difference;
+      nearestIndex = index;
     }
   });
 
   // ما نقبلوش بيانات بعيدة بأكثر من ساعة
-  if (smallestDifference > 60 * 60 * 1000) {
-    weatherIndex = -1;
-  }
+  return nearestDifference <= 60 * 60 * 1000
+    ? nearestIndex
+    : -1;
 }
 
-const visibilityMeters = weatherIndex >= 0
-  ? hourlyWeather?.visibility?.[weatherIndex]
-  : null;
+// 11. حالة الرؤية والضباب
+function renderVisibility(weather) {
+  const hourly = weather?.hourly;
+  const currentTime = weather?.current?.time;
+  const times = hourly?.time || [];
 
-el("visibility").textContent =
-  Number.isFinite(visibilityMeters)
-    ? (visibilityMeters / 1000).toFixed(1)
-    : "—";
+  const index = findNearestHour(times, currentTime);
 
-const weatherCode = weatherIndex >= 0
-  ? hourlyWeather?.weather_code?.[weatherIndex]
-  : null;
+  const visibility = index >= 0
+    ? hourly?.visibility?.[index]
+    : null;
 
-let fogText = "غير متوفر";
+  setText(
+    "visibility",
+    Number.isFinite(visibility)
+      ? (visibility / 1000).toFixed(1)
+      : "—"
+  );
 
-if (weatherCode != null) {
-  if ([45, 48].includes(Number(weatherCode))) {
-    fogText = "ضباب";
-  } else if ([51, 53, 55, 56, 57].includes(Number(weatherCode))) {
-    fogText = "رذاذ";
-  } else {
-    fogText = "الرمز لا يشير إلى ضباب";
-  }
-}
+  const code = index >= 0
+    ? hourly?.weather_code?.[index]
+    : null;
 
-el("fogStatus").textContent = fogText;
-    
+  let fogText = "غير متوفر";
 
-el("fogStatus").textContent = fogText;
-    if (weather && marine) {
-      renderForecast(weather, marine);
-      setStatus("تم التحديث");
-    } else if (weather || marine) {
-      renderForecast(weather, marine);
-      setStatus("بيانات جزئية", true);
+  if (code !== null && code !== undefined) {
+    const weatherCode = Number(code);
+
+    if ([45, 48].includes(weatherCode)) {
+      fogText = "ضباب";
+    } else if ([51, 53, 55, 56, 57].includes(weatherCode)) {
+      fogText = "رذاذ";
     } else {
-      el("forecast").innerHTML = '<div class="error-row">تعذر تحميل البيانات. تحقق من الإنترنت وحاول مجددًا.</div>';
-      setStatus("تعذر الاتصال", true);
+      fogText = "الرمز لا يشير إلى ضباب";
     }
-    if (selectedLayer === "wind") {
-      const speed = Number(current?.wind_speed_10m ?? 0);
-      const m = markers.find((_, i) => coastalPlaces[i].name === place.name);
-      if (m) m.setIcon(markerIcon(speed, "wind"));
-    }
-  } catch (error) {
-    if (currentRequest !== requestCounter) return;
-    console.error(error);
-    setStatus("خطأ في البيانات", true);
-    el("forecast").innerHTML = '<div class="error-row">تعذر تحميل البيانات. جرّب مرة أخرى بعد قليل.</div>';
+  }
+
+  setText("fogStatus", fogText);
+}
+
+// 12. عرض التوقعات بالساعات
+function renderForecast(weather, marine) {
+  const container = el("forecast");
+  if (!container) return;
+
+  const weatherTimes = weather?.hourly?.time || [];
+  const windSpeeds = weather?.hourly?.wind_speed_10m || [];
+  const windDirections = weather?.hourly?.wind_direction_10m || [];
+
+  const marineTimes = marine?.hourly?.time || [];
+  const waveHeights = marine?.hourly?.wave_height || [];
+  const wavePeriods = marine?.hourly?.wave_period || [];
+
+  if (!weatherTimes.length && !marineTimes.length) {
+    container.innerHTML =
+      '<div class="error-row">لا توجد توقعات متاحة حاليًا.</div>';
+    return;
+  }
+
+  const currentTime =
+    weather?.current?.time || marineTimes[0];
+
+  let start = findNearestHour(weatherTimes, currentTime);
+  if (start < 0) start = 0;
+
+  const indices = [];
+
+  for (
+    let i = start;
+    i < Math.min(weatherTimes.length, start + 24);
+    i += 3
+  ) {
+    indices.push(i);
+  }
+
+  if (!indices.length) {
+    container.innerHTML =
+      '<div class="error-row">لا توجد توقعات متاحة حاليًا.</div>';
+    return;
+  }
+
+  container.innerHTML = indices.map(i => {
+    const time = weatherTimes[i];
+    const date = new Date(time);
+
+    const label = Number.isFinite(date.getTime())
+      ? date.toLocaleString("ar-DZ", {
+          weekday: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZone: "Africa/Algiers"
+        })
+      : time;
+
+    const marineIndex = findNearestHour(marineTimes, time);
+
+    const windSpeed = windSpeeds[i];
+    const windDirection = windDirections[i];
+
+    const waveHeight = marineIndex >= 0
+      ? waveHeights[marineIndex]
+      : null;
+
+    const wavePeriod = marineIndex >= 0
+      ? wavePeriods[marineIndex]
+      : null;
+
+    const isWind = selectedLayer === "wind";
+
+    const mainValue = isWind
+      ? numberOrDash(windSpeed, 0)
+      : numberOrDash(waveHeight, 1);
+
+    const subValue = isWind
+      ? "كم/سا · " + compass(windDirection)
+      : "متر · " + numberOrDash(wavePeriod, 0) + " ثا";
+
+    return `
+      <article class="forecast-item">
+        <div class="forecast-time">${label}</div>
+        <div class="forecast-symbol">${isWind ? "💨" : "🌊"}</div>
+        <div class="forecast-main">${mainValue}</div>
+        <div class="forecast-sub">${subValue}</div>
+      </article>
+    `;
+  }).join("");
+}
+
+// 13. تحميل بيانات الموقع المختار
+async function loadLocation(place) {
+  const requestId = ++requestCounter;
+  selected = place;
+
+  setStatus("جاري تحميل بيانات " + place.name + "…");
+
+  const weatherResult = fetchWeather(place)
+    .then(data => ({ ok: true, data }))
+    .catch(error => ({ ok: false, error }));
+
+  const marineResult = fetchMarine(place)
+    .then(data => ({ ok: true, data }))
+    .catch(error => ({ ok: false, error }));
+
+  const [weatherResponse, marineResponse] = await Promise.all([
+    weatherResult,
+    marineResult
+  ]);
+
+  // تجاهل الردود القديمة إذا اختار المستخدم مدينة أخرى
+  if (requestId !== requestCounter) return;
+
+  const weather = weatherResponse.ok
+    ? weatherResponse.data
+    : null;
+
+  const marine = marineResponse.ok
+    ? marineResponse.data
+    : null;
+
+  const current = weather?.current;
+
+  // تحديث بطاقات الطقس إذا كانت موجودة في index.html
+  // الأسماء البديلة تسمح بدعم بعض اختلافات أسماء العناصر.
+  const windValue = numberOrDash(current?.wind_speed_10m, 0);
+  const windDirection = compass(current?.wind_direction_10m);
+  const temperature = numberOrDash(current?.temperature_2m, 1);
+
+  const waveValue = numberOrDash(
+    marine?.current?.wave_height,
+    1
+  );
+
+  [
+    "windSpeed",
+    "windValue",
+    "wind"
+  ].forEach(id => setText(id, windValue));
+
+  [
+    "windDirection",
+    "windDir"
+  ].forEach(id => setText(id, windDirection));
+
+  [
+    "temperature",
+    "temp",
+    "temperatureValue"
+  ].forEach(id => setText(id, temperature));
+
+  [
+    "waveHeight",
+    "waveValue",
+    "waves"
+  ].forEach(id => setText(id, waveValue));
+
+  setText(
+    "gusts",
+    "هبات الرياح: " +
+      numberOrDash(current?.wind_gusts_10m, 0) +
+      " كم/سا"
+  );
+
+  renderVisibility(weather);
+  renderForecast(weather, marine);
+
+  // تحديث رمز المدينة المختارة
+  const markerIndex = coastalPlaces.findIndex(
+    item => item.name === place.name
+  );
+
+  if (markerIndex >= 0 && markers[markerIndex]) {
+    const value = selectedLayer === "wind"
+      ? current?.wind_speed_10m
+      : marine?.current?.wave_height;
+
+    markers[markerIndex].setIcon(
+      markerIcon(
+        value,
+        selectedLayer,
+        current?.wind_direction_10m ?? 0
+      )
+    );
+  }
+
+  if (weather && marine) {
+    setStatus("تم تحديث بيانات " + place.name);
+  } else if (weather || marine) {
+    setStatus("بيانات جزئية — تعذر تحميل بعض المعلومات", true);
+  } else {
+    setStatus("تعذر الاتصال. تحقق من الإنترنت وحاول مجددًا.", true);
   }
 }
+
+// 14. اختيار نقطة على الخريطة
 map.on("click", event => {
-  const p = { name: "موقع مختار", lat: event.latlng.lat, lon: event.latlng.lng };
-  loadLocation(p);
+  const place = {
+    name: "موقع مختار",
+    lat: event.latlng.lat,
+    lon: event.latlng.lng
+  };
+
+  loadLocation(place);
 });
-document.querySelectorAll(".layer-btn").forEach(btn => {
-  btn.addEventListener("click", () => {
-    selectedLayer = btn.dataset.layer;
+
+// 15. التبديل بين الرياح والأمواج
+document.querySelectorAll(".layer-btn").forEach(button => {
+  button.addEventListener("click", () => {
+    const layer = button.dataset.layer;
+
+    if (layer !== "wind" && layer !== "waves") return;
+
+    selectedLayer = layer;
     updateMarkerStyles();
+
     if (selected) loadLocation(selected);
   });
 });
-el("refreshBtn").addEventListener("click", () => loadLocation(selected));
-el("locateBtn").addEventListener("click", () => {
-  if (!navigator.geolocation) {
-    setStatus("الموقع غير مدعوم", true);
-    return;
-  }
-  setStatus("تحديد الموقع…");
-  navigator.geolocation.getCurrentPosition(
-    pos => {
-      const p = { name: "موقعي", lat: pos.coords.latitude, lon: pos.coords.longitude };
-      map.flyTo([p.lat, p.lon], 9);
-      loadLocation(p);
-    },
-    () => setStatus("لم يُسمح بالموقع", true),
-    { enableHighAccuracy: false, timeout: 10000 }
-  );
-});
 
-showPlaceList();
-drawPlaceMarkers();
-loadLocation(selected);
+// 16. زر تحديث البيانات
+if (el("refreshBtn")) {
+  el("refreshBtn").addEventListener("click", () => {
+    if (selected) loadLocation(selected);
+  });
+}
 
-
-/* DzSea Wind - experimental animated wind layer */
-(() => {
-  const canvas = document.createElement("canvas");
-  canvas.style.cssText =
-    "position:absolute;inset:0;width:100%;height:100%;z-index:450;pointer-events:none;";
-  map.getContainer().appendChild(canvas);
-
-  const ctx = canvas.getContext("2d");
-  let windPoints = [];
-  let particles = [];
-  let animationId;
-  let refreshTimer;
-  let loading = false;
-
-  function resizeCanvas() {
-    const rect = map.getContainer().getBoundingClientRect();
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = Math.round(rect.width * dpr);
-    canvas.height = Math.round(rect.height * dpr);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, rect.width, rect.height);
-    particles = [];
-    for (let i = 0; i < 180; i++) {
-      particles.push({
-        x: Math.random() * rect.width,
-        y: Math.random() * rect.height,
-        age: Math.random() * 80
-      });
-    }
-  }
-  function nearestWind(lat, lon) {
-    if (!windPoints.length) return null;
-
-    let best = null;
-    let bestDistance = Infinity;
-
-    for (const p of windPoints) {
-      const dx = (p.lon - lon) * Math.cos(lat * Math.PI / 180);
-      const dy = p.lat - lat;
-      const distance = dx * dx + dy * dy;
-
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        best = p;
-      }
-    }
-    return best;
-  }
-
-  function windAt(x, y) {
-    const ll = map.containerPointToLatLng([x, y]);
-    const p = nearestWind(ll.lat, ll.lng);
-    if (!p) return null;
-
-    const angle = (p.direction + 180) * Math.PI / 180;
-    return {
-      dx: Math.sin(angle) * p.speed * 0.045,
-      dy: -Math.cos(angle) * p.speed * 0.045,
-      speed: p.speed
-    };
-  }
-
-  function drawParticles() {
-    const rect = map.getContainer().getBoundingClientRect();
-    const w = rect.width;
-    const h = rect.height;
-
-    if (selectedLayer !== "wind" || !windPoints.length) {
-      ctx.clearRect(0, 0, w, h);
-      animationId = requestAnimationFrame(drawParticles);
+// 17. تحديد الموقع الحالي
+if (el("locateBtn")) {
+  el("locateBtn").addEventListener("click", () => {
+    if (!navigator.geolocation) {
+      setStatus("تحديد الموقع غير مدعوم في هذا المتصفح", true);
       return;
     }
 
-    ctx.clearRect(0, 0, w, h);
-    ctx.fillRect(0, 0, w, h);
+    setStatus("جاري تحديد الموقع…");
 
-    for (const p of particles) {
-      const wind = windAt(p.x, p.y);
+    navigator.geolocation.getCurrentPosition(
+      position => {
+        const place = {
+          name: "موقعي",
+          lat: position.coords.latitude,
+          lon: position.coords.longitude
+        };
 
-      if (!wind || wind.speed < 1) {
-        p.age = 100;
-      } else {
-        const oldX = p.x;
-        const oldY = p.y;
-
-        p.x += wind.dx;
-        p.y += wind.dy;
-        p.age++;
-
-        ctx.beginPath();
-        ctx.moveTo(oldX, oldY);
-        ctx.lineTo(p.x, p.y);
-
-        ctx.strokeStyle =
-          wind.speed < 10 ? "rgba(115,226,187,.8)" :
-          wind.speed < 25 ? "rgba(75,214,231,.9)" :
-          wind.speed < 40 ? "rgba(255,206,105,.9)" :
-                            "rgba(255,138,120,.95)";
-
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
+        map.flyTo([place.lat, place.lon], 9);
+        loadLocation(place);
+      },
+      () => {
+        setStatus(
+          "تعذر تحديد الموقع. تحقق من إذن الموقع في المتصفح.",
+          true
+        );
+      },
+      {
+        enableHighAccuracy: false,
+        timeout: 10000,
+        maximumAge: 60000
       }
-
-      if (
-        p.age > 90 || p.x < 0 || p.x > w ||
-        p.y < 0 || p.y > h
-      ) {
-        p.x = Math.random() * w;
-        p.y = Math.random() * h;
-        p.age = 0;
-      }
-    }
-
-    animationId = requestAnimationFrame(drawParticles);
-  }
-
-  async function loadWindGrid() {
-    if (loading || selectedLayer !== "wind") return;
-    loading = true;
-
-    try {
-      const bounds = map.getBounds();
-      const south = Math.max(-75, bounds.getSouth());
-      const north = Math.min(75, bounds.getNorth());
-      const west = Math.max(-180, bounds.getWest());
-      const east = Math.min(180, bounds.getEast());
-
-      const latitudes = [];
-      const longitudes = [];
-      const count = 9;
-
-      for (let y = 0; y < count; y++) {
-        for (let x = 0; x < count; x++) {
-          latitudes.push(south + (north - south) * y / (count - 1));
-          longitudes.push(west + (east - west) * x / (count - 1));
-        }
-      }
-
-      const url = new URL("https://api.open-meteo.com/v1/forecast");
-      url.search = new URLSearchParams({
-        latitude: latitudes.join(","),
-        longitude: longitudes.join(","),
-        current: "wind_speed_10m,wind_direction_10m",
-        wind_speed_unit: "kmh"
-      }).toString();
-
-      const response = await fetch(url);
-      if (!response.ok) throw new Error("Wind API error");
-
-      const result = await response.json();
-      const locations = Array.isArray(result) ? result : [result];
-
-      windPoints = locations.map((item, i) => ({
-        lat: latitudes[i],
-        lon: longitudes[i],
-        speed: Number(item.current?.wind_speed_10m ?? 0),
-        direction: Number(item.current?.wind_direction_10m ?? 0)
-      })).filter(p =>
-        Number.isFinite(p.speed) &&
-        Number.isFinite(p.direction)
-      );
-    } catch (error) {
-      console.error("Wind overlay:", error);
-    } finally {
-      loading = false;
-    }
-  }
-
-  function scheduleWindRefresh() {
-    clearTimeout(refreshTimer);
-    refreshTimer = setTimeout(() => {
-      resizeCanvas();
-      loadWindGrid();
-    }, 900);
-  }
-canvas.style.display = "none";
-  map.on("moveend zoomend", scheduleWindRefresh);
-  map.on("movestart zoomstart", () => {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    );
   });
+}
 
-  const oldUpdateMarkerStyles = updateMarkerStyles;
-  updateMarkerStyles = function () {
-    oldUpdateMarkerStyles();
-    if (selectedLayer === "wind") {
-      scheduleWindRefresh();
-    } else {
-      windPoints = [];
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-    }
-  };
+// 18. بدء تشغيل الموقع
+showPlaceList();
+drawPlaceMarkers();
+updateMarkerStyles();
+loadLocation(selected);
 
-  window.addEventListener("resize", resizeCanvas);
+// إصلاح عرض الخريطة بعد تحميل الصفحة
+window.addEventListener("load", () => {
+  setTimeout(() => map.invalidateSize(), 200);
+});
 
-  resizeCanvas();
-  loadWindGrid();
-  drawParticles();
-})();
+window.addEventListener("resize", () => {
+  map.invalidateSize();
+});
+
+// إبقاء الطبقة التجريبية مخفية كما كانت.
+// لا نشغّل رسومها المتحركة أو طلباتها الإضافية.
+const experimentalCanvas = document.createElement("canvas");
+experimentalCanvas.style.display = "none";
