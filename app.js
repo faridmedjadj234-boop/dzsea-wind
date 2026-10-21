@@ -145,7 +145,8 @@ async function loadLocation(place) {
     el("waveDirection").textContent = "الاتجاه: " + compass(marineHourly?.wave_direction?.[marineIndex]);
     el("wavePeriod").textContent = numberOrDash(marineHourly?.wave_period?.[marineIndex], 0);
     el("temperature").textContent = numberOrDash(current?.temperature_2m, 1);
-    el("gusts").textContent = "هبات الرياح: " + numberOrDash(current?.wind_gusts_10m, 0) + " كم/سا";const hourlyWeather = weather?.hourly;
+    el("gusts").textContent = "هبات الرياح: " + numberOrDash(current?.wind_gusts_10m, 0) + " كم/سا";
+    const hourlyWeather = weather?.hourly;
 const weatherTimes = hourlyWeather?.time || [];
 const weatherIndex = weatherTimes.findIndex(t => t === currentTime);
 
