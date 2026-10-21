@@ -168,7 +168,7 @@ if (weatherCode != null) {
   } else if ([51, 53, 55, 56, 57].includes(weatherCode)) {
     fogText = "رذاذ";
   } else {
-    fogText = "لا يوجد ضباب في التوقع";
+    fogText = "الرمز لا يشير إلى ضباب";
   }
 }
 
