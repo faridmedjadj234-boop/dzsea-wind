@@ -145,7 +145,34 @@ async function loadLocation(place) {
     el("waveDirection").textContent = "الاتجاه: " + compass(marineHourly?.wave_direction?.[marineIndex]);
     el("wavePeriod").textContent = numberOrDash(marineHourly?.wave_period?.[marineIndex], 0);
     el("temperature").textContent = numberOrDash(current?.temperature_2m, 1);
-    el("gusts").textContent = "هبات الرياح: " + numberOrDash(current?.wind_gusts_10m, 0) + " كم/سا";
+    el("gusts").textContent = "هبات الرياح: " + numberOrDash(current?.wind_gusts_10m, 0) + " كم/سا";const hourlyWeather = weather?.hourly;
+const weatherTimes = hourlyWeather?.time || [];
+const weatherIndex = weatherTimes.findIndex(t => t === currentTime);
+
+const visibilityMeters = weatherIndex >= 0
+  ? hourlyWeather?.visibility?.[weatherIndex]
+  : null;
+
+el("visibility").textContent =
+  visibilityMeters == null ? "—" : (visibilityMeters / 1000).toFixed(1);
+
+const weatherCode = weatherIndex >= 0
+  ? hourlyWeather?.weather_code?.[weatherIndex]
+  : null;
+
+let fogText = "غير متوفر";
+
+if (weatherCode != null) {
+  if ([45, 48].includes(weatherCode)) {
+    fogText = "ضباب";
+  } else if ([51, 53, 55, 56, 57].includes(weatherCode)) {
+    fogText = "رذاذ";
+  } else {
+    fogText = "لا يوجد ضباب في التوقع";
+  }
+}
+
+el("fogStatus").textContent = fogText;
     if (weather && marine) {
       renderForecast(weather, marine);
       setStatus("تم التحديث");
