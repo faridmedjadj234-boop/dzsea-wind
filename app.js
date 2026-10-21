@@ -117,7 +117,7 @@ async function loadLocation(place) {
   weatherUrl.search = new URLSearchParams({
     latitude: place.lat, longitude: place.lon,
     current: "temperature_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m",
-    hourly: "wind_speed_10m,wind_direction_10m",
+    hourly: "wind_speed_10m,wind_direction_10m,visibility,weather_code",
     forecast_days: "3", timezone: "Africa/Algiers", wind_speed_unit: "kmh"
   }).toString();
   const marineUrl = new URL("https://marine-api.open-meteo.com/v1/marine");
