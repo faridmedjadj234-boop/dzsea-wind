@@ -81,81 +81,40 @@ function updateMarkerStyles() {
 }
 function renderForecast(weather, marine) {
   const times = weather?.hourly?.time || [];
-  const ws = weather?.hourly?.wind_speed_10m || [];
-  const wd = weather?.hourly?.wind_direction_10m || [];
-  const wave = marine?.hourly?.wave_height || [];
-  const period = marine?.hourly?.wave_period || [];
-  const now = new Date();
-  let start = times.findIndex(t => new Date(t) >= now);
-  if (start < 0) start = 0;
-  const indices = [];
-  for (let i = start; i < Math.min(times.length, start + 24); i += 3) indices.push(i);
-  if (!indices.length) {
-    el("forecast").innerHTML = '<div class="error-row">لا توجد توقعات متاحة حاليًا.</div>';
-    return;
-  }
-  el("forecast").innerHTML = indices.map(i => {
-    const time = new Date(times[i]);
-    const label = time.toLocaleString("ar-DZ", { weekday: "short", hour: "2-digit", minute: "2-digit", timeZone: "Africa/Algiers" });
-    const windKmh = ws[i] == null ? null : ws[i];
-    return `<article class="forecast-item">
-      <div class="forecast-time">${label}</div>
-      <div class="forecast-symbol">${selectedLayer === "wind" ? "💨" : "🌊"}</div>
-      <div class="forecast-main">${selectedLayer === "wind" ? numberOrDash(windKmh, 0) : numberOrDash(wave[i], 1)}</div>
-      <div class="forecast-sub">${selectedLayer === "wind" ? "كم/سا · " + compass(wd[i]) : "متر · " + numberOrDash(period[i], 0) + " ثا"}</div>
-    </article>`;
-  }).join("");
-}
-async function loadLocation(place) {
-  selected = place;
-  const currentRequest = ++requestCounter;
-  el("selectedTitle").textContent = place.name || "موقع مختار";
-  el("selectedCoords").textContent = `${Number(place.lat).toFixed(4)}, ${Number(place.lon).toFixed(4)}`;
-  setStatus("جارٍ التحميل…");
-  el("forecast").innerHTML = '<div class="loading-row">جارٍ جلب بيانات الطقس والأمواج…</div>';
-  const weatherUrl = new URL("https://api.open-meteo.com/v1/forecast");
-  weatherUrl.search = new URLSearchParams({
-    latitude: place.lat, longitude: place.lon,
-    current: "temperature_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m",
-    hourly: "wind_speed_10m,wind_direction_10m,visibility,weather_code",
-    forecast_days: "3", timezone: "Africa/Algiers", wind_speed_unit: "kmh"
-  }).toString();
-  const marineUrl = new URL("https://marine-api.open-meteo.com/v1/marine");
-  marineUrl.search = new URLSearchParams({
-    latitude: place.lat, longitude: place.lon,
-    hourly: "wave_height,wave_direction,wave_period,wind_wave_height,swell_wave_height",
-    forecast_days: "3", timezone: "Africa/Algiers", length_unit: "metric"
-  }).toString();
-  try {
-    const results = await Promise.allSettled([
-      fetch(weatherUrl).then(r => { if (!r.ok) throw new Error("weather " + r.status); return r.json(); }),
-      fetch(marineUrl).then(r => { if (!r.ok) throw new Error("marine " + r.status); return r.json(); })
-    ]);
-    if (currentRequest !== requestCounter) return;
-    const weather = results[0].status === "fulfilled" ? results[0].value : null;
-    const marine = results[1].status === "fulfilled" ? results[1].value : null;
-    const current = weather?.current;
-    const marineHourly = marine?.hourly;
-    const currentTime = current?.time;
-    let marineIndex = marineHourly?.time?.findIndex(t => t === currentTime) ?? 0;
-    if (marineIndex < 0) marineIndex = 0;
-    el("windSpeed").textContent = numberOrDash(current?.wind_speed_10m, 0);
-    el("windDirection").textContent = "الاتجاه: " + compass(current?.wind_direction_10m);
-    el("waveHeight").textContent = numberOrDash(marineHourly?.wave_height?.[marineIndex], 1);
-    el("waveDirection").textContent = "الاتجاه: " + compass(marineHourly?.wave_direction?.[marineIndex]);
-    el("wavePeriod").textContent = numberOrDash(marineHourly?.wave_period?.[marineIndex], 0);
-    el("temperature").textContent = numberOrDash(current?.temperature_2m, 1);
-    el("gusts").textContent = "هبات الرياح: " + numberOrDash(current?.wind_gusts_10m, 0) + " كم/سا";
-    const hourlyWeather = weather?.hourly;
+  
+const hourlyWeather = weather?.hourly;
 const weatherTimes = hourlyWeather?.time || [];
-const weatherIndex = weatherTimes.findIndex(t => t === currentTime);
+
+let weatherIndex = -1;
+
+if (currentTime && weatherTimes.length > 0) {
+  const currentTimestamp = new Date(currentTime).getTime();
+  let smallestDifference = Infinity;
+
+  weatherTimes.forEach((time, index) => {
+    const timestamp = new Date(time).getTime();
+    const difference = Math.abs(timestamp - currentTimestamp);
+
+    if (Number.isFinite(difference) && difference < smallestDifference) {
+      smallestDifference = difference;
+      weatherIndex = index;
+    }
+  });
+
+  // ما نقبلوش بيانات بعيدة بأكثر من ساعة
+  if (smallestDifference > 60 * 60 * 1000) {
+    weatherIndex = -1;
+  }
+}
 
 const visibilityMeters = weatherIndex >= 0
   ? hourlyWeather?.visibility?.[weatherIndex]
   : null;
 
 el("visibility").textContent =
-  visibilityMeters == null ? "—" : (visibilityMeters / 1000).toFixed(1);
+  Number.isFinite(visibilityMeters)
+    ? (visibilityMeters / 1000).toFixed(1)
+    : "—";
 
 const weatherCode = weatherIndex >= 0
   ? hourlyWeather?.weather_code?.[weatherIndex]
@@ -164,14 +123,17 @@ const weatherCode = weatherIndex >= 0
 let fogText = "غير متوفر";
 
 if (weatherCode != null) {
-  if ([45, 48].includes(weatherCode)) {
+  if ([45, 48].includes(Number(weatherCode))) {
     fogText = "ضباب";
-  } else if ([51, 53, 55, 56, 57].includes(weatherCode)) {
+  } else if ([51, 53, 55, 56, 57].includes(Number(weatherCode))) {
     fogText = "رذاذ";
   } else {
     fogText = "الرمز لا يشير إلى ضباب";
   }
 }
+
+el("fogStatus").textContent = fogText;
+    
 
 el("fogStatus").textContent = fogText;
     if (weather && marine) {
