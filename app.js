@@ -508,6 +508,42 @@ const rawWindDirection =
 const windValue = numberOrDash(rawWindSpeed, 0);
 const windDirection = compass(rawWindDirection);
 const temperature = numberOrDash(current?.temperature_2m, 1);
+const pressure = numberOrDash(
+  current?.surface_pressure,
+  0
+);
+
+const humidity = numberOrDash(
+  current?.relative_humidity_2m,
+  0
+);
+
+const cloudCover = numberOrDash(
+  current?.cloud_cover,
+  0
+);
+
+const apparentTemperature = numberOrDash(
+  current?.apparent_temperature,
+  1
+);
+
+const precipitation = numberOrDash(
+  current?.precipitation,
+  1
+);
+
+const rain = numberOrDash(
+  current?.rain,
+  1
+);
+
+const showers = numberOrDash(
+  current?.showers,
+  1
+);
+
+const weatherCode = current?.weather_code;
 
   const marineTimes = marine?.hourly?.time || [];
 const waveHeights = marine?.hourly?.wave_height || [];
