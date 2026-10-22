@@ -447,13 +447,30 @@ async function loadLocation(place) {
     ? marineResponse.data
     : null;
 
-  const current = weather?.current;
+  
+const current = weather?.current;
 
-  // تحديث بطاقات الطقس إذا كانت موجودة في index.html
-  // الأسماء البديلة تسمح بدعم بعض اختلافات أسماء العناصر.
-  const windValue = numberOrDash(current?.wind_speed_10m, 0);
-  const windDirection = compass(current?.wind_direction_10m);
-  const temperature = numberOrDash(current?.temperature_2m, 1);
+// جلب الرياح الحالية، مع بديل من التوقعات بالساعات
+const weatherTimes = weather?.hourly?.time || [];
+const hourlyWindSpeeds = weather?.hourly?.wind_speed_10m || [];
+const hourlyWindDirections = weather?.hourly?.wind_direction_10m || [];
+
+const weatherIndex = findNearestHour(
+  weatherTimes,
+  current?.time || new Date().toISOString()
+);
+
+const rawWindSpeed =
+  current?.wind_speed_10m ??
+  (weatherIndex >= 0 ? hourlyWindSpeeds[weatherIndex] : null);
+
+const rawWindDirection =
+  current?.wind_direction_10m ??
+  (weatherIndex >= 0 ? hourlyWindDirections[weatherIndex] : null);
+
+const windValue = numberOrDash(rawWindSpeed, 0);
+const windDirection = compass(rawWindDirection);
+const temperature = numberOrDash(current?.temperature_2m, 1);
 
   const marineTimes = marine?.hourly?.time || [];
 const waveHeights = marine?.hourly?.wave_height || [];
