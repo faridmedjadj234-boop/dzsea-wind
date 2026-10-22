@@ -326,6 +326,30 @@ function findNearestHour(times, currentTime) {
 }
 
 // 11. حالة الرؤية والضباب
+  function getWeatherDescription(code) {
+  const descriptions = {
+    0: "سماء صافية ☀️",
+    1: "صحو غالبًا 🌤️",
+    2: "غائم جزئيًا ⛅",
+    3: "سماء غائمة ☁️",
+    45: "ضباب 🌫️",
+    48: "ضباب كثيف 🌫️",
+    51: "رذاذ خفيف 🌦️",
+    53: "رذاذ متوسط 🌦️",
+    55: "رذاذ كثيف 🌧️",
+    61: "أمطار خفيفة 🌧️",
+    63: "أمطار متوسطة 🌧️",
+    65: "أمطار غزيرة 🌧️",
+    80: "زخات مطر خفيفة 🌦️",
+    81: "زخات مطر متوسطة 🌧️",
+    82: "زخات مطر قوية 🌧️",
+    95: "عاصفة رعدية ⛈️",
+    96: "رعد مع برد ⛈️",
+    99: "رعد قوي مع برد ⛈️"
+  };
+
+  return descriptions[Number(code)] ?? "حالة الطقس غير متوفرة";
+} 
 function renderVisibility(weather) {
   const hourly = weather?.hourly;
   const currentTime = weather?.current?.time;
