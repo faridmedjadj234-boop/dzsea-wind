@@ -514,6 +514,7 @@ const wavePeriodValue = numberOrDash(
     "waves"
   ].forEach(id => setText(id, waveValue));
 setText("wavePeriod", wavePeriodValue);
+   
   setText(
     "gusts",
     "هبات الرياح: " +
