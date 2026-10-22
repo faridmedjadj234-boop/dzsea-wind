@@ -84,3 +84,19 @@ footer { display: flex; justify-content: space-between; gap: 12px; padding: 18px
   .map-wrap { margin-top: 20px; }
   .content { padding-left: 22px; padding-right: 22px; }
 }
+
+/* إصلاح عرض حالة الضباب */
+#fogStatus {
+  font-size: 14px !important;
+  font-weight: 600;
+  letter-spacing: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+  display: block;
+  max-width: 100%;
+}
+
+.metric-card {
+  min-width: 0;
+}
