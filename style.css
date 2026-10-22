@@ -219,6 +219,29 @@ main {
     font-size: 11px;
   }
 
+/* إصلاح ظهور أسماء المدن حرفًا تحت حرف */
+.place-btn {
+  width: 100%;
+  min-width: 0;
+  text-align: right;
+  overflow-wrap: normal !important;
+  word-break: normal !important;
+  white-space: normal;
+}
+
+.place-btn strong,
+.place-btn span {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
+  white-space: nowrap !important;
+  text-align: right;
+  line-height: 1.8;
+}
+  
+  
   .map-action {
     padding: 7px 9px;
     font-size: 11px;
