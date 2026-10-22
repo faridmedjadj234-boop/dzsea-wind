@@ -568,8 +568,9 @@ const showers = numberOrDash(
 );
 
 const weatherCode = current?.weather_code;
+setText("weatherDescription", getWeatherDescription(weatherCode));
 
-  const marineTimes = marine?.hourly?.time || [];
+const marineTimes = marine?.hourly?.time || [];
 const waveHeights = marine?.hourly?.wave_height || [];
 const wavePeriods = marine?.hourly?.wave_period || [];
 
