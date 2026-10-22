@@ -602,6 +602,19 @@ setText("showers", showers);
       " كم/سا"
   );
 
+   const daily = weather?.daily;
+
+const sunrise = daily?.sunrise?.[0];
+const sunset = daily?.sunset?.[0];
+
+const formatSunTime = (value) => {
+  if (!value) return "—";
+
+  return value.split("T")[1] || "—";
+};
+
+setText("sunrise", formatSunTime(sunrise));
+setText("sunset", formatSunTime(sunset));
   renderVisibility(weather);
   renderForecast(weather, marine);
 
