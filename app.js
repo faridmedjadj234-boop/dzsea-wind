@@ -321,7 +321,7 @@ function renderVisibility(weather) {
     } else if ([51, 53, 55, 56, 57].includes(weatherCode)) {
       fogText = "رذاذ";
     } else {
-      fogText = "الرمز لا يشير إلى ضباب";
+      fogText = "لا يوجد ضباب";
     }
   }
 
