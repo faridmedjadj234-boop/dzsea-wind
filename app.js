@@ -242,9 +242,9 @@ function updateMarkerStyles() {
 
 // 8. جلب البيانات من واجهة الطقس
 async function fetchWeather(place) {
-
-async function fetchWeather(place) {
-  const url = new URL("https://api.open-meteo.com/v1/forecast");
+  const url = new URL(
+    "https://api.open-meteo.com/v1/forecast"
+  );
 
   url.search = new URLSearchParams({
     latitude: String(place.lat),
@@ -257,7 +257,6 @@ async function fetchWeather(place) {
       "wind_speed_10m,wind_direction_10m,visibility,weather_code,relative_humidity_2m,cloud_cover,precipitation_probability,precipitation,rain,showers",
 
     daily: "sunrise,sunset",
-
     forecast_days: "3",
     timezone: "Africa/Algiers",
     wind_speed_unit: "kmh"
@@ -266,7 +265,9 @@ async function fetchWeather(place) {
   const response = await fetch(url);
 
   if (!response.ok) {
-    throw new Error("Weather API: " + response.status);
+    throw new Error(
+      "Weather API: " + response.status
+    );
   }
 
   return response.json();
