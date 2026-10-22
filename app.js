@@ -587,6 +587,13 @@ const wavePeriodValue = numberOrDash(
     "waves"
   ].forEach(id => setText(id, waveValue));
 setText("wavePeriod", wavePeriodValue);
+setText("pressure", pressure);
+setText("humidity", humidity);
+setText("cloudCover", cloudCover);
+setText("apparentTemperature", apparentTemperature);
+setText("precipitation", precipitation);
+setText("rain", rain);
+setText("showers", showers);
    
   setText(
     "gusts",
